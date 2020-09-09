@@ -61,104 +61,17 @@
 
         var pressData = new Array(tiffHeight);
         var tempData = new Array(tiffHeight);
-        // var uData = new Array(tiffHeight);
-        // var vData = new Array(tiffHeight);
-        // var spdData = new Array(tiffHeight);
         for (var j = 0; j < tiffHeight; j++) {
-          pressData[j] = new Array(tiffWidth);
-          // tempData[j] = new Array(tiffWidth);
-          // uData[j] = new Array(tiffWidth);
-          // vData[j] = new Array(tiffWidth);
-          // spdData[j] = new Array(tiffWidth);
+          pressData[j] = new Array(tiffWidth); // tempData[j] = new Array(tiffWidth);
           for (var i = 0; i < tiffWidth; i++) {
             pressData[j][i] = rasters[0][i + j * tiffWidth];
-            // tempData[j][i] = rasters[1][i + j*tiffWidth];
-            // uData[j][i] = rasters[2][i + j*tiffWidth];
-            // vData[j][i] = rasters[3][i + j*tiffWidth];
-            // spdData[j][i] = 1.943844492 * Math.sqrt(uData[j][i]*uData[j][i] + vData[j][i]*vData[j][i]);
           }
         }
 
         //Creating the color scale https://github.com/santilland/plotty/blob/master/src/plotty.js
         // 把他理解为色标 0 -> 1 即可
-        // var cs_def = {
-        //   positions: [
-        //     0.0,
-        //     0.030303030303,
-        //     0.0606060606061,
-        //     0.0909090909091,
-        //     0.121212121212,
-        //     0.151515151515,
-        //     0.181818181818,
-        //     0.212121212121,
-        //     0.242424242424,
-        //     0.272727272727,
-        //     0.30303030303,
-        //     0.333333333333,
-        //     0.363636363636,
-        //     0.393939393939,
-        //     0.424242424242,
-        //     0.454545454545,
-        //     0.484848484848,
-        //     0.515151515152,
-        //     0.545454545455,
-        //     0.575757575758,
-        //     0.606060606061,
-        //     0.636363636364,
-        //     0.666666666667,
-        //     0.69696969697,
-        //     0.727272727273,
-        //     0.757575757576,
-        //     0.787878787879,
-        //     0.818181818182,
-        //     0.848484848485,
-        //     0.878787878788,
-        //     0.909090909091,
-        //     0.939393939394,
-        //     0.969696969697,
-        //     1.0,
-        //   ],
-        //   colors: [
-        //     "#ffffff",
-        //     "#e5e5e6",
-        //     "#d1d1d1",
-        //     "#bababa",
-        //     "#979797",
-        //     "#646464",
-        //     "#1464d3",
-        //     "#1e6eeb",
-        //     "#2883f1",
-        //     "#3c97f5",
-        //     "#50a5f5",
-        //     "#78b9fb",
-        //     "#97d3fb",
-        //     "#b5f1fb",
-        //     "#e1ffff",
-        //     "#0ea10e",
-        //     "#1eb31e",
-        //     "#36d33c",
-        //     "#50ef50",
-        //     "#78f572",
-        //     "#97f58d",
-        //     "#b5fbab",
-        //     "#c9ffbf",
-        //     "#ffe978",
-        //     "#ffc13c",
-        //     "#ffa100",
-        //     "#ff6000",
-        //     "#ff3200",
-        //     "#e11400",
-        //     "#c10000",
-        //     "#a50000",
-        //     "#643c32",
-        //     "#785046",
-        //     "#8d645a",
-        //   ],
-        // };
         var cs_def = {
-          positions: [
-            0.0,0.02,0.03,0.04,0.05,0.06,0.07
-          ],
+          positions: [0.0, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07],
           colors: [
             "#1464d3",
             "#2883f1",
@@ -174,10 +87,8 @@
         canvasColorScale.width = scaleWidth;
         canvasColorScale.height = 1;
         canvasColorScale.style.display = "none";
-
         document.body.appendChild(canvasColorScale);
         // 获得渲染上下文和它的绘画功能
-        
         var contextColorScale = canvasColorScale.getContext("2d");
 
         // 定义从黑到白的渐变（从左向右），作为矩形的填充样式：
@@ -191,7 +102,7 @@
         // y0	渐变开始点的 y 坐标
         // x1	渐变结束点的 x 坐标
         // y1	渐变结束点的 y 坐标
-        // context.createLinearGradient(x0,y0,x1,y1);        
+        // context.createLinearGradient(x0,y0,x1,y1);
         var gradient = contextColorScale.createLinearGradient(
           0,
           0,
@@ -202,7 +113,7 @@
         for (var i = 0; i < cs_def.colors.length; ++i) {
           gradient.addColorStop(cs_def.positions[i], cs_def.colors[i]);
         }
-        
+
         contextColorScale.fillStyle = gradient;
         // 绘制“已填色”的矩形。默认的填充颜色是黑色
         // context.fillRect(x,y,width,height);
@@ -225,11 +136,14 @@
           1
         ).data;
 
+        // ---
+        
         //Calculating the image
         // TODO:[*] 这个尺寸目前不知道是怎么确定的
         var width = 680,
           height = 500;
 
+        // TODO:[-] 20-09-09 注意此处与 raster-pixels 中的对比(关于渲染canvas的)
         var canvasRaster = document.createElement("canvas");
         canvasRaster.width = width;
         canvasRaster.height = height;
@@ -260,7 +174,7 @@
               geoTransform[0] + (i * tiffWidth * geoTransform[1]) / width;
             var pointCoordsY =
               geoTransform[3] + (j * tiffHeight * geoTransform[5]) / height;
-            
+
             // ---
             // 以下为内插像素
             var px = invGeoTransform[0] + pointCoordsX * invGeoTransform[1];
@@ -300,7 +214,7 @@
             // 建议将 domain[0] 改为0.1 如果是0的话，则无法区分无值的情况
             var c = Math.round((scaleWidth - 1) * ((value - 0.1) / 170));
             // var c = Math.round((scaleWidth - 0) * ((value - 8) / 96));
-            // 背景深度 灰色 还是 黑色 
+            // 背景深度 灰色 还是 黑色
             // 如果该值低于或超出标尺的极限，则必须使用alpha部分来避免出现奇怪的颜色。它将透明度设置为100％
             // 此处为 rgb 的除了三原色之外的第四个值，实际对应的是透明度
             var alpha = 255;
@@ -314,6 +228,8 @@
             pos = pos + 4;
           }
         }
+
+        // TODO:[-] 20-09-09 此处做针对 leaflet 的处理
         contextRaster.putImageData(id, 0, 0);
         var imageBounds = [
           [geoTransform[3], geoTransform[0]],
@@ -328,7 +244,7 @@
         });
 
         var baseLayer = L.tileLayer(
-          'http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          "http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
           {
             maxZoom: 18,
             attribution:

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="geotiff.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.0.2/dist/leaflet.css"
+/>
+<script src="https://unpkg.com/leaflet@1.0.2/dist/leaflet.js"></script>
+<script src="geotiff.min.js"></script>
+<script src="raster-marching-squares.min.js"></script>
+<style>
+  #map {
+    width: 680px;
+    height: 500px;
+  }
+</style>
+<body>
+  <div id="map"></div>
+
+  <script>
+    var width = 680,
+      height = 500;
+    // 注意此处为选择投影
+    // d3 -geo 支持的投影可以参考:
+    // https://github.com/d3/d3-geo-projection 我选择的是墨卡托投影
+    var projection = d3
+      .geoAzimuthalEqualArea()
+      .rotate([-55.5, -24])
+      .scale(1100);
+
+    var canvas = d3
+      .select("body")
+      .append("canvas")
+      .attr("width", width)
+      .attr("height", height);
+
+    var context = canvas.node().getContext("2d");
+    // 测试加入我自己的 tiff test_all_fet | tz850.tiff
+    d3.request("tz850.tiff")
+      .responseType("arraybuffer")
+      .get(function (error, tiffData) {
+        d3.json("world-110m.json", function (error, topojsonData) {
+          var countries = topojson.feature(
+            topojsonData,
+            topojsonData.objects.countries
+          );
+          var path = d3.geoPath().projection(projection).context(context);
+
+          context.beginPath();
+          context.strokeStyle = "#777";
+          context.fillStyle = "#aaa";
+          path(countries);
+          context.fill();
+          context.stroke();
+
+          var tiff = GeoTIFF.parse(tiffData.response);
+          var image = tiff.getImage();
+          var rasters = image.readRasters();
+          var tiepoint = image.getTiePoints()[0];
+          // TODO: 新添加的 tiff 的宽高
+          var tiffWidth = image.getWidth();
+          var tiffHeight = image.getHeight();
+          // ---
+          var pixelScale = image.getFileDirectory().ModelPixelScale;
+          var geoTransform = [
+            tiepoint.x,
+            pixelScale[0],
+            0,
+            tiepoint.y,
+            0,
+            -1 * pixelScale[1],
+          ];
+          var invGeoTransform = [
+            -geoTransform[0] / geoTransform[1],
+            1 / geoTransform[1],
+            0,
+            -geoTransform[3] / geoTransform[5],
+            0,
+            1 / geoTransform[5],
+          ];
+
+          var tempData = new Array(image.getHeight());
+          for (var j = 0; j < image.getHeight(); j++) {
+            tempData[j] = new Array(image.getWidth());
+            for (var i = 0; i < image.getWidth(); i++) {
+              tempData[j][i] = rasters[1][i + j * image.getWidth()];
+            }
+          }
+
+          //Creating the color scale https://github.com/santilland/plotty/blob/master/src/plotty.js
+          var cs_def = {
+            positions: [0, 0.25, 0.5, 0.75, 1],
+            colors: ["#0571b0", "#92c5de", "#f7f7f7", "#f4a582", "#ca0020"],
+          };
+          var scaleWidth = 256;
+
+          // TODO:[-] 20-09-09  创建canvas画布
+          var canvasColorScale = document.createElement("canvas");
+          canvasColorScale.width = scaleWidth;
+          canvasColorScale.height = 1;
+          canvasColorScale.style.display = "none";
+          document.body.appendChild(canvasColorScale);
+          // 这种创建画布与上面有什么区别?
+          // var canvasColorScale = d3
+          //   .select("body")
+          //   .append("canvas")
+          //   .attr("width", scaleWidth)
+          //   .attr("height", 1)
+          //   .style("display", "none");
+          // var contextColorScale = canvasColorScale.node().getContext("2d");
+          var contextColorScale = canvasColorScale.getContext("2d");
+          var gradient = contextColorScale.createLinearGradient(
+            0,
+            0,
+            scaleWidth,
+            1
+          );
+
+          for (var i = 0; i < cs_def.colors.length; ++i) {
+            gradient.addColorStop(cs_def.positions[i], cs_def.colors[i]);
+          }
+          contextColorScale.fillStyle = gradient;
+          contextColorScale.fillRect(0, 0, scaleWidth, 1);
+
+          var csImageData = contextColorScale.getImageData(
+            0,
+            0,
+            scaleWidth - 1,
+            1
+          ).data;
+
+          // ---
+
+          // TODO:[-] 20-09-09 注意此处与 leaflet-raster 中的对比(关于渲染canvas的)
+          //Drawing the image
+          // TODO: 参考 leaflet-raster 的创建 canvas 画布的方式
+          var width = 680,
+            height = 500;
+          var canvasRaster = document.createElement("canvas");
+          canvasRaster.width = width;
+          canvasRaster.height = height;
+          canvasRaster.style.display = "none";
+          document.body.appendChild(canvasRaster);
+          var contextRaster = canvasRaster.getContext("2d");
+
+          // 与上面的创建方式不同，若用上面的方式并不会绘制出 canvas的画布？
+          // var canvasRaster = d3
+          //   .select("body")
+          //   .append("canvas")
+          //   .attr("width", width)
+          //   .attr("height", height)
+          //   .style("display", "none");
+          // var contextRaster = canvasRaster.node().getContext("2d");
+
+          var id = contextRaster.createImageData(width, height);
+          var data = id.data;
+          var pos = 0;
+
+          for (var j = 0; j < height; j++) {
+            for (var i = 0; i < width; i++) {
+              // 要获得值矩阵中的位置，必须使用projection.invert将输出投影转换为lat-lon
+              var pointCoords = projection.invert([i, j]);
+              var px = Math.round(
+                invGeoTransform[0] + pointCoords[0] * invGeoTransform[1]
+              );
+              var py = Math.round(
+                invGeoTransform[3] + pointCoords[1] * invGeoTransform[5]
+              );
+
+              if (
+                Math.floor(px) >= 0 &&
+                Math.ceil(px) < image.getWidth() &&
+                Math.floor(py) >= 0 &&
+                Math.ceil(py) < image.getHeight()
+              ) {
+                var value = tempData[py][px];
+
+                var c = Math.round((scaleWidth - 1) * ((value - 14) / 24));
+                var alpha = 250;
+                if (c < 0 || c > scaleWidth - 1) {
+                  alpha = 0;
+                }
+                data[pos] = csImageData[c * 4];
+                data[pos + 1] = csImageData[c * 4 + 1];
+                data[pos + 2] = csImageData[c * 4 + 2];
+                data[pos + 3] = alpha;
+                pos = pos + 4;
+              }
+            }
+          }
+          contextRaster.putImageData(id, 0, 0);
+          context.drawImage(canvasRaster, 0, 0);
+          // 注意使用 参考leaflet-raster 的创建方式，不再使用 canvasRaster.node() 的方式
+          // context.drawImage(canvasRaster.node(), 0, 0);
+
+          // 自己添加的 imageBounds
+          var imageBounds = [
+            [geoTransform[3], geoTransform[0]],
+            [
+              geoTransform[3] + tiffHeight * geoTransform[5],
+              geoTransform[0] + tiffWidth * geoTransform[1],
+            ],
+          ];
+          // 以下为在 leaflet 中添加而新加的部分 ，缺少 ImageBounds
+          var imageLayer = L.imageOverlay(
+            canvasRaster.toDataURL(),
+            imageBounds,
+            {
+              opacity: 0.5,
+            }
+          );
+
+          var baseLayer = L.tileLayer(
+            "http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            {
+              maxZoom: 18,
+              attribution:
+                'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
+                '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+                'Imagery © <a href="http://mapbox.com">Mapbox</a>',
+              id: "mapbox.light",
+            }
+          );
+
+          var map = L.map("map", {
+            layers: [baseLayer, imageLayer],
+          }).setView([13, 81], 6);
+        });
+      });
+  </script>
+</body>
