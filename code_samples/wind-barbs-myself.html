@@ -12,10 +12,12 @@
   <script src="geotiff.min.js"></script>
   <script src="http://d3js.org/topojson.v1.min.js"></script>
   <link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.0.2/dist/leaflet.css"
-/>
-<script src="https://unpkg.com/leaflet@1.0.2/dist/leaflet.js"></script>
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.0.2/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.0.2/dist/leaflet.js"></script>
+  
+  <script src="proj4.js"></script>
   <script>
     var width = 680,
       height = 500,
@@ -92,6 +94,26 @@
           xPos.forEach(function (x) {
             yPos.forEach(function (y) {
               var coords = projection.invert([x, y]);
+              // 加入原始的坐标系因为不是 wgs84 坐标系！注意
+              // 
+              // TODO:[*] 20-09-11 发现转换的风场的数据由于投影的问题存在问题,最后未能解决，因为不知道该当前读取的tiff的坐标系
+              // 参考:http://proj4js.org/
+              proj4.defs([
+                [
+                  "EPSG:4326",
+                  "+title=WGS 84 (long/lat) +proj=longlat +ellps=WGS84 +datum=WGS84 +units=degrees",
+                ],
+                [
+                  "EPSG:4269",
+                  "+title=NAD83 (long/lat) +proj=longlat +a=6378137.0 +b=6356752.31414036 +ellps=GRS80 +datum=NAD83 +units=degrees",
+                ],
+              ]);
+              // 调用指定投影
+              proj4('EPSG:4326');
+              // 转换
+              coords = proj4('EPSG:4326').forward(coords);
+              // ----
+              /// 以上部分为 20-09-11 新添加的加入了投影转换的部分
               var px = Math.round(
                 (coords[0] - geoTransform[0]) / geoTransform[1]
               );

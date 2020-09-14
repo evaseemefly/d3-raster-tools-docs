@@ -41,7 +41,8 @@ d3.json("world-110m.json", function(error, topojsonData) {
   var rasters = image.readRasters();
   var tiepoint = image.getTiePoints()[0];
   var pixelScale = image.getFileDirectory().ModelPixelScale;
-  var geoTransform = [tiepoint.x, pixelScale[0], 0, tiepoint.y, 0, -1*pixelScale[1]];
+  // 将矩阵上像素位置转换为地图坐标的公式称为GeoTransform
+  var geoTransform = [tiepoint.x, pixelScale[0], 0, tiepoint.y, 0, -1*pixelScale[1]];  
   var invGeoTransform = [-geoTransform[0]/geoTransform[1], 1/geoTransform[1],0,-geoTransform[3]/geoTransform[5],0,1/geoTransform[5]];
 
   var tempData = new Array(image.getHeight());
@@ -90,6 +91,10 @@ d3.json("world-110m.json", function(error, topojsonData) {
 
       var value;
       if(Math.floor(px) >= 0 && Math.ceil(px) < image.getWidth() && Math.floor(py) >= 0 && Math.ceil(py) < image.getHeight()){
+        // 若不使用插值
+        // var value = tempData[py][px];
+
+        // --- 以下为使用插值的计算的部分——与 raster-pixels.html 的对比
         //https://en.wikipedia.org/wiki/Bilinear_interpolation
         var dist1 = (Math.ceil(px)-px)*(Math.ceil(py)-py);
         var dist2 = (px-Math.floor(px))*(Math.ceil(py)-py);
@@ -106,6 +111,8 @@ d3.json("world-110m.json", function(error, topojsonData) {
       } else {
         value = -999;
       }
+      // --- 以上为插值计算的部分
+
         var c = Math.round((scaleWidth-1) * ((value - 14)/24));
         var alpha = 200;
         if (c<0 || c > (scaleWidth-1)){

@@ -37,7 +37,8 @@
       .attr("height", height);
 
     var context = canvas.node().getContext("2d");
-    // 测试加入我自己的 tiff test_all_fet | tz850.tiff
+    // 测试加入我自己的 tiff test_all_fet | tz850.tiff | ./my-data/ecsnew_current_20200618.tiff
+    // TODO:[-] 20-09-11 测一下流场(目前存在流场投影加载后存在偏移的问题)
     d3.request("tz850.tiff")
       .responseType("arraybuffer")
       .get(function (error, tiffData) {
@@ -208,7 +209,7 @@
             canvasRaster.toDataURL(),
             imageBounds,
             {
-              opacity: 0.5,
+              opacity: 0.9,
             }
           );
 
@@ -227,6 +228,14 @@
           var map = L.map("map", {
             layers: [baseLayer, imageLayer],
           }).setView([13, 81], 6);
+          // 加入岸线的wms服务
+          var wmsLayer = L.tileLayer
+            .wms("http://localhost:8082/geoserver/nmefc_common/wms?", {
+              layers: "nmefc_common:world_map_line",
+              format: "image/png",
+              transparent: true,
+            })
+            .addTo(map);
         });
       });
   </script>

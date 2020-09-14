@@ -25,35 +25,17 @@
     <div id="map"></div>
     <script>
       var xhr = new XMLHttpRequest();
-      // 读取一下 西北太风场的数据测试一下 test_all_fet.tiff | vardah.tiff
-      // 在读取东中国海流场时出现漂移的问题
-      // 目前看 实例中的 vardah.tiff 与我的 ecsnew_current_xx.tiff 都是相同的投影 WGS 84
+      // 读取一下 西北太风场的数据测试一下 vardah.tiff | ./my-data/ecsnew_current_20200618.tiff
       xhr.open("GET", "ecsnew_current_20200618.tiff", true);
       xhr.responseType = "arraybuffer";
       xhr.onload = function (e) {
-        // 下面的备注是家在测试 tiff的 vardah.tiff
-        // geotiff.js 是最常用的格式化 geotiff 的工具
         var tiff = GeoTIFF.parse(this.response);
         var image = tiff.getImage();
-        // 相当于是 geotiff 本身的 宽高
-        // 188
         var tiffWidth = image.getWidth();
-        //137
         var tiffHeight = image.getHeight();
-        // [Float32Array(25756), Float32Array(25756), Float32Array(25756), Float32Array(25756)]
         var rasters = image.readRasters();
-        // i: 0
-        // j: 0
-        // k: 0
-        // x: 69.90238016932595
-        // y: 20.03206514657981
-        // z: 0
-        // 起点	114.217,41.0167,相当于 tiff 图层的起点的坐标
         var tiepoint = image.getTiePoints()[0];
-        // 单位像素的大小:Float64Array(3) [0.03333333333333333, 0.03333333333333333, 0]
         var pixelScale = image.getFileDirectory().ModelPixelScale;
-        // [对角线 左侧顶部 ,像素大小[0] ,对角线 右下 ,像素大小 [1]]
-        // [69.90238016932595, 0.11718756105503093, 0, 20.03206514657981, 0, -0.11714657980456025]
         var geoTransform = [
           tiepoint.x,
           pixelScale[0],
@@ -64,26 +46,86 @@
         ];
 
         var pressData = new Array(tiffHeight);
-        var tempData = new Array(tiffHeight);
         for (var j = 0; j < tiffHeight; j++) {
-          pressData[j] = new Array(tiffWidth); // tempData[j] = new Array(tiffWidth);
+          pressData[j] = new Array(tiffWidth);
           for (var i = 0; i < tiffWidth; i++) {
             pressData[j][i] = rasters[0][i + j * tiffWidth];
           }
         }
 
         //Creating the color scale https://github.com/santilland/plotty/blob/master/src/plotty.js
-        // 把他理解为色标 0 -> 1 即可
         var cs_def = {
-          positions: [0.0, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07],
+          positions: [
+            0.0,
+            0.030303030303,
+            0.0606060606061,
+            0.0909090909091,
+            0.121212121212,
+            0.151515151515,
+            0.181818181818,
+            0.212121212121,
+            0.242424242424,
+            0.272727272727,
+            0.30303030303,
+            0.333333333333,
+            0.363636363636,
+            0.393939393939,
+            0.424242424242,
+            0.454545454545,
+            0.484848484848,
+            0.515151515152,
+            0.545454545455,
+            0.575757575758,
+            0.606060606061,
+            0.636363636364,
+            0.666666666667,
+            0.69696969697,
+            0.727272727273,
+            0.757575757576,
+            0.787878787879,
+            0.818181818182,
+            0.848484848485,
+            0.878787878788,
+            0.909090909091,
+            0.939393939394,
+            0.969696969697,
+            1.0,
+          ],
           colors: [
+            "#ffffff",
+            "#e5e5e6",
+            "#d1d1d1",
+            "#bababa",
+            "#979797",
+            "#646464",
             "#1464d3",
+            "#1e6eeb",
             "#2883f1",
+            "#3c97f5",
+            "#50a5f5",
             "#78b9fb",
+            "#97d3fb",
             "#b5f1fb",
+            "#e1ffff",
+            "#0ea10e",
             "#1eb31e",
+            "#36d33c",
+            "#50ef50",
+            "#78f572",
+            "#97f58d",
+            "#b5fbab",
+            "#c9ffbf",
+            "#ffe978",
+            "#ffc13c",
             "#ffa100",
+            "#ff6000",
+            "#ff3200",
+            "#e11400",
+            "#c10000",
             "#a50000",
+            "#643c32",
+            "#785046",
+            "#8d645a",
           ],
         };
         var scaleWidth = 256;
@@ -91,48 +133,23 @@
         canvasColorScale.width = scaleWidth;
         canvasColorScale.height = 1;
         canvasColorScale.style.display = "none";
+
         document.body.appendChild(canvasColorScale);
         // 获得渲染上下文和它的绘画功能
         var contextColorScale = canvasColorScale.getContext("2d");
-
-        // 定义从黑到白的渐变（从左向右），作为矩形的填充样式：
-        // createLinearGradient() 方法创建线性的渐变对象。
-        // 渐变可用于填充矩形、圆形、线条、文本等等。
-        // 提示：请使用该对象作为 strokeStyle 或 fillStyle 属性的值。
-        // 提示：请使用 addColorStop() 方法规定不同的颜色，以及在 gradient 对象中的何处定位颜色。
-        // 参数值
-        // 参数	描述
-        // x0	渐变开始点的 x 坐标
-        // y0	渐变开始点的 y 坐标
-        // x1	渐变结束点的 x 坐标
-        // y1	渐变结束点的 y 坐标
-        // context.createLinearGradient(x0,y0,x1,y1);
         var gradient = contextColorScale.createLinearGradient(
           0,
           0,
-          scaleWidth, //256
+          scaleWidth,
           1
         );
 
         for (var i = 0; i < cs_def.colors.length; ++i) {
           gradient.addColorStop(cs_def.positions[i], cs_def.colors[i]);
         }
-
         contextColorScale.fillStyle = gradient;
-        // 绘制“已填色”的矩形。默认的填充颜色是黑色
-        // context.fillRect(x,y,width,height);
-        // x	矩形左上角的 x 坐标
-        // y	矩形左上角的 y 坐标
-        // width	矩形的宽度，以像素计
-        // height	矩形的高度，以像素计
         contextColorScale.fillRect(0, 0, scaleWidth, 1);
 
-        // 返回一个ImageData对象，用来描述canvas区域隐含的像素数据，这个区域通过矩形表示，起始点为(sx, sy)、宽为sw、高为sh。
-        // ImageData ctx.getImageData(sx, sy, sw, sh);
-        // sx 将要被提取的图像数据矩形区域的左上角 x 坐标。
-        // sy 将要被提取的图像数据矩形区域的左上角 y 坐标。
-        // sw 将要被提取的图像数据矩形区域的宽度。
-        // sh 将要被提取的图像数据矩形区域的高度。
         var csImageData = contextColorScale.getImageData(
           0,
           0,
@@ -140,14 +157,10 @@
           1
         ).data;
 
-        // ---
-        
         //Calculating the image
-        // TODO:[*] 这个尺寸目前不知道是怎么确定的
         var width = 680,
           height = 500;
 
-        // TODO:[-] 20-09-09 注意此处与 raster-pixels 中的对比(关于渲染canvas的)
         var canvasRaster = document.createElement("canvas");
         canvasRaster.width = width;
         canvasRaster.height = height;
@@ -160,13 +173,6 @@
         var id = contextRaster.createImageData(width, height);
         var data = id.data;
         var pos = 0;
-
-        // geoTransform: [对角线 左侧顶部 ,像素大小[0] ,对角线 右下 ,像素大小 [1]]
-        // invGeoTransform: (6) [-596.5, 8.533328887443975, 0, 171.00000000000006, 0, -8.536314091869649]
-        // TODO:[*] invGeoTransform 何用?
-        // 将矩阵上的像素位置转换为地图坐标的公式:
-        // 参考:https://geoexamples.com/d3-raster-tools-docs/intr/geotransform.html
-        // TODO:[-] geoTransform -> inv (矩阵坐标 -> 地图坐标 | 地图坐标 -> 矩阵坐标)
         var invGeoTransform = [
           -geoTransform[0] / geoTransform[1],
           1 / geoTransform[1],
@@ -177,13 +183,15 @@
         ];
         for (var j = 0; j < height; j++) {
           for (var i = 0; i < width; i++) {
+            // TODO:[-] 地理转换 将矩阵上的像素位置 -> 地图坐标的公式为 geoTransform
             var pointCoordsX =
               geoTransform[0] + (i * tiffWidth * geoTransform[1]) / width;
             var pointCoordsY =
               geoTransform[3] + (j * tiffHeight * geoTransform[5]) / height;
 
-            // ---
-            // 以下为内插像素
+            // https://geoexamples.com/d3-raster-tools-docs/intr/geotransform.html
+            // Xgeo = GT(0) + Xpixel*GT(1)
+            // Ygeo = GT(3) + Yline*GT(5)
             var px = invGeoTransform[0] + pointCoordsX * invGeoTransform[1];
             var py = invGeoTransform[3] + pointCoordsY * invGeoTransform[5];
 
@@ -194,10 +202,8 @@
               Math.floor(py) >= 0 &&
               Math.ceil(py) < image.getHeight()
             ) {
-              // Math.ceil 对数字进行向上取整
               var dist1 = (Math.ceil(px) - px) * (Math.ceil(py) - py);
               var dist2 = (px - Math.floor(px)) * (Math.ceil(py) - py);
-              // Math.floor()执行向下舍入
               var dist3 = (Math.ceil(px) - px) * (py - Math.floor(py));
               var dist4 = (px - Math.floor(px)) * (py - Math.floor(py));
               if (dist1 != 0 || dist2 != 0 || dist3 != 0 || dist4 != 0) {
@@ -212,20 +218,8 @@
             } else {
               value = -999;
             }
-
-            // ---
-            // TODO:[*] 8 与 88 是如何取值的
-            // Math.round()执行标准舍入
-            // var c = Math.round((scaleWidth-1) * ((value - domain[0])/(domain[1]-domain[0])));
-            // 计算从0到255的位置。domain [0]是最小值，domain [1]是最大值
-            // 感觉此处在调整rgb的值
-            // 建议将 domain[0] 改为0.1 如果是0的话，则无法区分无值的情况
-            var c = Math.round((scaleWidth - 1) * ((value - 0.1) / 170));
-            // var c = Math.round((scaleWidth - 0) * ((value - 8) / 96));
-            // 背景深度 灰色 还是 黑色
-            // 如果该值低于或超出标尺的极限，则必须使用alpha部分来避免出现奇怪的颜色。它将透明度设置为100％
-            // 此处为 rgb 的除了三原色之外的第四个值，实际对应的是透明度
-            var alpha = 255;
+            var c = Math.round((scaleWidth - 1) * ((value - 8) / 88));
+            var alpha = 200;
             if (c < 0 || c > scaleWidth - 1) {
               alpha = 0;
             }
@@ -236,8 +230,6 @@
             pos = pos + 4;
           }
         }
-
-        // TODO:[-] 20-09-09 此处做针对 leaflet 的处理
         contextRaster.putImageData(id, 0, 0);
         var imageBounds = [
           [geoTransform[3], geoTransform[0]],
@@ -251,12 +243,8 @@
           opacity: 0.5,
         });
 
-
-        // "http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        // |
-        // 'http://localhost/images/map/tdt-8level/{z}/{x}/{y}.png'
-        var baseLayer = L.tileLayer("http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          ,
+        var baseLayer = L.tileLayer(
+          "http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
           {
             maxZoom: 18,
             attribution:
@@ -270,6 +258,43 @@
         var map = L.map("map", {
           layers: [baseLayer, imageLayer],
         }).setView([13, 81], 6);
+
+        // 加入岸线的wms服务
+        var wmsLayer = L.tileLayer
+          .wms("http://localhost:8082/geoserver/nmefc_common/wms?", {
+            layers: "nmefc_common:world_map_line",
+            format: "image/png",
+            transparent: true,
+          })
+          .addTo(map);
+
+        map.on("click", function (e) {
+          var xTiff = (e.latlng.lng - geoTransform[0]) / geoTransform[1];
+          var yTiff = (e.latlng.lat - geoTransform[3]) / geoTransform[5];
+          var press = pressData[Math.round(yTiff)][Math.round(xTiff)];
+          var dir = 270 + (Math.atan2(-vValue, uValue) * 180) / Math.PI;
+          if (dir < 0) {
+            dir = dir + 360;
+          }
+          if (dir > 360) {
+            dir = dir - 360;
+          }
+
+          L.popup()
+            .setLatLng(e.latlng)
+            .setContent(
+              "Wind speed: " +
+                spd.toFixed(1) +
+                " kt <br/>Wind dir: " +
+                dir.toFixed(0) +
+                "º <br/>Temp: " +
+                temp.toFixed(1) +
+                " C<br/>Pressure: " +
+                press.toFixed(0) +
+                " hPa"
+            )
+            .openOn(map);
+        });
       };
       xhr.send();
     </script>

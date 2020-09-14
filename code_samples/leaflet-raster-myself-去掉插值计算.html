@@ -48,9 +48,7 @@
         // x: 69.90238016932595
         // y: 20.03206514657981
         // z: 0
-        // 起点	114.217,41.0167,相当于 tiff 图层的起点的坐标
         var tiepoint = image.getTiePoints()[0];
-        // 单位像素的大小:Float64Array(3) [0.03333333333333333, 0.03333333333333333, 0]
         var pixelScale = image.getFileDirectory().ModelPixelScale;
         // [对角线 左侧顶部 ,像素大小[0] ,对角线 右下 ,像素大小 [1]]
         // [69.90238016932595, 0.11718756105503093, 0, 20.03206514657981, 0, -0.11714657980456025]
@@ -141,7 +139,7 @@
         ).data;
 
         // ---
-        
+
         //Calculating the image
         // TODO:[*] 这个尺寸目前不知道是怎么确定的
         var width = 680,
@@ -166,7 +164,6 @@
         // TODO:[*] invGeoTransform 何用?
         // 将矩阵上的像素位置转换为地图坐标的公式:
         // 参考:https://geoexamples.com/d3-raster-tools-docs/intr/geotransform.html
-        // TODO:[-] geoTransform -> inv (矩阵坐标 -> 地图坐标 | 地图坐标 -> 矩阵坐标)
         var invGeoTransform = [
           -geoTransform[0] / geoTransform[1],
           1 / geoTransform[1],
@@ -175,17 +172,14 @@
           0,
           1 / geoTransform[5],
         ];
+        var px = invGeoTransform[0] + pointCoordsX * invGeoTransform[1];
+        var py = invGeoTransform[3] + pointCoordsY * invGeoTransform[5];
         for (var j = 0; j < height; j++) {
           for (var i = 0; i < width; i++) {
             var pointCoordsX =
               geoTransform[0] + (i * tiffWidth * geoTransform[1]) / width;
             var pointCoordsY =
               geoTransform[3] + (j * tiffHeight * geoTransform[5]) / height;
-
-            // ---
-            // 以下为内插像素
-            var px = invGeoTransform[0] + pointCoordsX * invGeoTransform[1];
-            var py = invGeoTransform[3] + pointCoordsY * invGeoTransform[5];
 
             var value;
             if (
@@ -194,46 +188,29 @@
               Math.floor(py) >= 0 &&
               Math.ceil(py) < image.getHeight()
             ) {
-              // Math.ceil 对数字进行向上取整
-              var dist1 = (Math.ceil(px) - px) * (Math.ceil(py) - py);
-              var dist2 = (px - Math.floor(px)) * (Math.ceil(py) - py);
-              // Math.floor()执行向下舍入
-              var dist3 = (Math.ceil(px) - px) * (py - Math.floor(py));
-              var dist4 = (px - Math.floor(px)) * (py - Math.floor(py));
-              if (dist1 != 0 || dist2 != 0 || dist3 != 0 || dist4 != 0) {
-                value =
-                  pressData[Math.floor(py)][Math.floor(px)] * dist1 +
-                  pressData[Math.floor(py)][Math.ceil(px)] * dist2 +
-                  pressData[Math.ceil(py)][Math.floor(px)] * dist3 +
-                  pressData[Math.ceil(py)][Math.ceil(px)] * dist4;
-              } else {
-                value = pressData[Math.floor(py)][Math.floor(px)];
+              var value = tempData[py][px];
+              // ---
+              // TODO:[*] 8 与 88 是如何取值的
+              // Math.round()执行标准舍入
+              // var c = Math.round((scaleWidth-1) * ((value - domain[0])/(domain[1]-domain[0])));
+              // 计算从0到255的位置。domain [0]是最小值，domain [1]是最大值
+              // 感觉此处在调整rgb的值
+              // 建议将 domain[0] 改为0.1 如果是0的话，则无法区分无值的情况
+              var c = Math.round((scaleWidth - 1) * ((value - 0.1) / 170));
+              // var c = Math.round((scaleWidth - 0) * ((value - 8) / 96));
+              // 背景深度 灰色 还是 黑色
+              // 如果该值低于或超出标尺的极限，则必须使用alpha部分来避免出现奇怪的颜色。它将透明度设置为100％
+              // 此处为 rgb 的除了三原色之外的第四个值，实际对应的是透明度
+              var alpha = 200;
+              if (c < 0 || c > scaleWidth - 1) {
+                alpha = 0;
               }
-            } else {
-              value = -999;
+              data[pos] = csImageData[c * 4];
+              data[pos + 1] = csImageData[c * 4 + 1];
+              data[pos + 2] = csImageData[c * 4 + 2];
+              data[pos + 3] = alpha;
+              pos = pos + 4;
             }
-
-            // ---
-            // TODO:[*] 8 与 88 是如何取值的
-            // Math.round()执行标准舍入
-            // var c = Math.round((scaleWidth-1) * ((value - domain[0])/(domain[1]-domain[0])));
-            // 计算从0到255的位置。domain [0]是最小值，domain [1]是最大值
-            // 感觉此处在调整rgb的值
-            // 建议将 domain[0] 改为0.1 如果是0的话，则无法区分无值的情况
-            var c = Math.round((scaleWidth - 1) * ((value - 0.1) / 170));
-            // var c = Math.round((scaleWidth - 0) * ((value - 8) / 96));
-            // 背景深度 灰色 还是 黑色
-            // 如果该值低于或超出标尺的极限，则必须使用alpha部分来避免出现奇怪的颜色。它将透明度设置为100％
-            // 此处为 rgb 的除了三原色之外的第四个值，实际对应的是透明度
-            var alpha = 255;
-            if (c < 0 || c > scaleWidth - 1) {
-              alpha = 0;
-            }
-            data[pos] = csImageData[c * 4];
-            data[pos + 1] = csImageData[c * 4 + 1];
-            data[pos + 2] = csImageData[c * 4 + 2];
-            data[pos + 3] = alpha;
-            pos = pos + 4;
           }
         }
 
@@ -251,12 +228,8 @@
           opacity: 0.5,
         });
 
-
-        // "http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        // |
-        // 'http://localhost/images/map/tdt-8level/{z}/{x}/{y}.png'
-        var baseLayer = L.tileLayer("http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          ,
+        var baseLayer = L.tileLayer(
+          "http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
           {
             maxZoom: 18,
             attribution:
